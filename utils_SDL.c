@@ -78,13 +78,11 @@ int interaction(SDL_Event *p_e, SDL_Surface* window, SDL_Surface* surface, struc
 							SDL_GetMouseState(&mouse_x, &mouse_y);
 							if (*start) {
 								*A = getNodeFromGraph(graph, mouse_y, mouse_x);
-								printf("Start node : %d\n", (* A)->m_color);
 								_SDL_SetPixel(surface, mouse_x, mouse_y, (uint8_t)0, (uint8_t)255, (uint8_t)0);
 								*start = false;
 							}
 							else {
 								*B = getNodeFromGraph(graph, mouse_y, mouse_x);
-								printf("End node : %d\n", (* B)->m_color);
 								_SDL_SetPixel(surface, mouse_x, mouse_y, (uint8_t)0, (uint8_t)255, (uint8_t)0);
 								
 								getShortestpath(graph, *A, *B, surface, window);
