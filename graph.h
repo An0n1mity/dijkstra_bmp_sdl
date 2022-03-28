@@ -45,5 +45,8 @@ struct Node_s** createAntecedentsarray(struct Node_s* A, int size);
 struct Node_s* getNodeFromGraph(struct Graph_s* graph, int row, int col);
 bool* createTrackingarray(struct Node_s* A, int size);
 int* createDistancearray(struct Node_s* A, int size);
+struct Node_s* getNodeWithMinimalDistance(struct Node_s** nodesarray, int* distancearray, int size);
+int mapValue(int value, int heighest_value, int lowest_value);
 
 void getShortestpath(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, SDL_Surface* surface, SDL_Surface* window);
+void getShortestpathV2(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, struct Node_s* S, struct Node_s** antecedentsarray, int* distancearray, struct Edge_s** to_draw);

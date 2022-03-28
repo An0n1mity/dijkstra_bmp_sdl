@@ -32,7 +32,7 @@ SDL_Surface * init(char * p_heightmapPath, SDL_Surface **p_heightmap, char * p_w
 	return window;
 }
 
-int interaction(SDL_Event *p_e, SDL_Surface* window, SDL_Surface* surface, struct Graph_s* graph, struct Node_s** A, struct Node_s** B, bool* start)
+int interaction(SDL_Event *p_e, struct Graph_s* graph, struct Node_s** A, struct Node_s** B, bool* start, bool* search)
 {
 	int quit = 0;
 	int mouse_x, mouse_y;
@@ -74,22 +74,17 @@ int interaction(SDL_Event *p_e, SDL_Surface* window, SDL_Surface* surface, struc
 				switch (p_e->button.button)
 				{
 					case SDL_BUTTON_LEFT:
-						{
 							SDL_GetMouseState(&mouse_x, &mouse_y);
 							if (*start) {
 								*A = getNodeFromGraph(graph, mouse_y, mouse_x);
-								_SDL_SetPixel(surface, mouse_x, mouse_y, (uint8_t)0, (uint8_t)255, (uint8_t)0);
 								*start = false;
 							}
 							else {
 								*B = getNodeFromGraph(graph, mouse_y, mouse_x);
-								_SDL_SetPixel(surface, mouse_x, mouse_y, (uint8_t)0, (uint8_t)255, (uint8_t)0);
-								
-								getShortestpath(graph, *A, *B, surface, window);
-
 								*start = true;
+								*search = true;
 							}
-						}
+				
 						break;
 
 					case SDL_BUTTON_RIGHT:
@@ -111,16 +106,43 @@ int interaction(SDL_Event *p_e, SDL_Surface* window, SDL_Surface* surface, struc
 	return quit;
 }
 
-int update()
+int update(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, struct Node_s** antecedentarray, int* distancearray, int* idx, SDL_Surface* heightmap, SDL_Surface* copy, SDL_Surface* window, bool* search)
 {
+	struct Edge_s* to_draw = NULL;
+	struct Node_s* S = getNodeWithMinimalDistance(graph->nodesarray, distancearray, graph->m_nbnodes);
 
+	if (*idx >= 0 && *idx < graph->m_nbnodes)
+		getShortestpathV2(graph, A, B, S, antecedentarray, distancearray, &to_draw);
+
+	while (to_draw)
+	{
+		_SDL_SetPixel(copy, to_draw->m_node->m_col, to_draw->m_node->m_row, mapValue(distancearray[S->m_index], 255, 10), 0, 0);
+		to_draw = to_draw->m_next;
+	}
+
+	if (B == S)
+	{
+		copy = copy_surface(heightmap);
+		int f = B->m_index;
+		while (antecedentarray[f] != A)
+		{
+			_SDL_SetPixel(copy, antecedentarray[f]->m_col, antecedentarray[f]->m_row, 0, 255, 0);
+			draw(window, copy);
+			f = antecedentarray[f]->m_index;
+		}
+		*search = false;
+	}
+
+	draw(window, copy);
+
+	*idx = *idx + 1;
 	return 0;
 }
 
 SDL_Surface* copy_surface(SDL_Surface* surface)
 {
 	SDL_Surface* copy;
-	copy = SDL_CreateRGBSurface(SDL_HWSURFACE, surface->w, surface->h, surface->format->BitsPerPixel, surface->format->Rmask, surface->format->Gmask, surface->format->Bmask, surface->format->Amask);
+	copy = SDL_CreateRGBSurface(0, surface->w, surface->h, 24, surface->format->Rmask, surface->format->Gmask, surface->format->Bmask, surface->format->Amask);
 
 	if (copy == NULL || surface == NULL)
 		return NULL;

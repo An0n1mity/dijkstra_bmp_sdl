@@ -21,13 +21,13 @@ struct Graph_s* createGraphFromSurface(SDL_Surface* surface)
 	return graph;
 }
 
-struct Node_s* getNodeWithMinimalDistance(struct Node_s** nodesarray, int* distancearray, bool* trackingarray, int size)
+struct Node_s* getNodeWithMinimalDistance(struct Node_s** nodesarray, int* distancearray, int size)
 {
 	int min = 100000;
 	struct Node_s* S = NULL;
 	for (size_t i = 0; i < size; i++)
 	{
-		if (distancearray[i] < min && (!trackingarray[i]))
+		if (distancearray[i] < min && !nodesarray[i]->flag && nodesarray[i]->m_color)
 		{
 			min = distancearray[i];
 			S = nodesarray[i];
@@ -42,7 +42,7 @@ void getShortestpath(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, 
 {
 	SDL_Surface* copy = copy_surface(surface);
 
-	bool* trackingarray = createTrackingarray(A, graph->m_nbnodes);
+	//bool* trackingarray = createTrackingarray(A, graph->m_nbnodes);
 	struct Node_s** antecedentsarray = createAntecedentsarray(A, graph->m_nbnodes);
 	int* distancearray = createDistancearray(A, graph->m_nbnodes);
 	struct Node_s* S;
@@ -50,22 +50,20 @@ void getShortestpath(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, 
 
 	for (size_t i = 0; i < graph->m_nbnodes; i++)
 	{
-		S = getNodeWithMinimalDistance(graph->nodesarray, distancearray, trackingarray, graph->m_nbnodes);
+		S = getNodeWithMinimalDistance(graph->nodesarray, distancearray, NULL, graph->m_nbnodes);
 		j = S->m_index;
-		trackingarray[j] = true;
+		S->flag = true;
 
 		if (S == B)
 			break;
 
-		_SDL_SetPixel(surface, graph->nodesarray[j]->m_col, graph->nodesarray[j]->m_row, 255, 0, 0);
-		draw(window, surface);
+		_SDL_SetPixel(copy, graph->nodesarray[j]->m_col, graph->nodesarray[j]->m_row, distancearray[j], 0, 0);
 
 			struct Edge_s* cursor = S->m_neighbours;
 			while (cursor)
 			{
-				if (!trackingarray[cursor->m_node->m_index]) {
-					_SDL_SetPixel(surface, cursor->m_node->m_col, cursor->m_node->m_row, 255, 0, 0);
-					draw(window, surface);
+				if (!cursor->m_node->flag) {
+					_SDL_SetPixel(copy, cursor->m_node->m_col, cursor->m_node->m_row, distancearray[j], 0, 0);
 
 					if (distancearray[j] + cursor->m_distance < distancearray[cursor->m_node->m_index])
 					{
@@ -75,18 +73,48 @@ void getShortestpath(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, 
 				}
 				cursor = cursor->m_next;
 			}
+			draw(window, copy);
+
 	}
 
 	draw(window, copy);
-
+	copy = copy_surface(surface);
 	int f = B->m_index;
 	while (antecedentsarray[f])
 	{
 		_SDL_SetPixel(copy, antecedentsarray[f]->m_col, antecedentsarray[f]->m_row, 0, 255, 0);
 		draw(window, copy);
+
 		f = antecedentsarray[f]->m_index;
 	}
 
+
+}
+
+void getShortestpathV2(struct Graph_s* graph, struct Node_s* A, struct Node_s* B, struct Node_s* S, struct Node_s** antecedentsarray, int* distancearray, struct Edge_s** to_draw)
+{
+	int j;
+
+		j = S->m_index;
+		S->flag = true;
+
+		if (S == B)
+			return;
+
+		*to_draw = S->m_neighbours;
+		struct Edge_s* cursor = S->m_neighbours;
+		while (cursor)
+		{
+			if (!cursor->m_node->flag) {
+
+				if (distancearray[j] + cursor->m_distance < distancearray[cursor->m_node->m_index])
+				{
+					distancearray[cursor->m_node->m_index] = distancearray[j] + cursor->m_distance;
+					antecedentsarray[cursor->m_node->m_index] = S;
+				}
+			}
+			cursor = cursor->m_next;
+		}
 }
 
 bool* createTrackingarray(struct Node_s* A, int size)
@@ -142,43 +170,54 @@ uint8_t* getPixelsarrayFromSurface(SDL_Surface* surface)
 				pixelsarray[width * y + x] = pixel[0] << 16 | pixel[1] << 8 | pixel[2];
 			else
 				pixelsarray[width * y + x] = pixel[0] | pixel[1] << 8 | pixel[2] << 16;
-
-			//printf("%hhx\n", pixelsarray[width * y + x]);
 		}
 	}
 
 	return pixelsarray;
 }
 
+int mapValue(int value, int highest_value, int lowest_value)
+{
+	return (highest_value / lowest_value) * value;
+}
+
 void addNeighboursToNodesarray(struct Node_s** nodesarray, int width, int height)
 {
 	int row, col;
+	float weight = 1.f;
 	struct Node_s* neighbour = NULL;
 	for (size_t i = 0; i < width * height; i++)
 	{
-		//printf("%hhx\n", nodesarray[i]->m_color);
 		row = i / width;
 		col = i % width;
 
 		// Up neighbours
 		if (row + 1 < height) {
 			neighbour = getNodeFromNodesarray(nodesarray, row + 1, col, width);
-			addNeighboursToNode(nodesarray[i], neighbour, abs(neighbour->m_color - nodesarray[i]->m_color));
+			if (neighbour->m_color - nodesarray[i]->m_color < 0)
+				weight = 0.5f;
+			addNeighboursToNode(nodesarray[i], neighbour, weight * mapValue(abs(neighbour->m_color - nodesarray[i]->m_color), 255, 1));
 		}
 		// Down neighbours
 		if (row - 1 >= 0) {
 			neighbour = getNodeFromNodesarray(nodesarray, row - 1, col, width);
-			addNeighboursToNode(nodesarray[i], neighbour, abs(neighbour->m_color - nodesarray[i]->m_color));
+			if (neighbour->m_color - nodesarray[i]->m_color < 0)
+				weight = 0.5f;
+			addNeighboursToNode(nodesarray[i], neighbour, weight * mapValue(abs(neighbour->m_color - nodesarray[i]->m_color), 255, 1));
 		}
 		// Right neighbours
 		if (col + 1 < width) {
 			neighbour = getNodeFromNodesarray(nodesarray, row, col + 1, width);
-			addNeighboursToNode(nodesarray[i], neighbour, abs(neighbour->m_color - nodesarray[i]->m_color));
+			if (neighbour->m_color - nodesarray[i]->m_color < 0)
+				weight = 0.5f;
+			addNeighboursToNode(nodesarray[i], neighbour, weight * mapValue(abs(neighbour->m_color - nodesarray[i]->m_color), 255, 1));
 		}
 		// Column neighbours
 		if (col - 1 >= 0) {
 			neighbour = getNodeFromNodesarray(nodesarray, row, col - 1, width);
-			addNeighboursToNode(nodesarray[i], neighbour, abs(neighbour->m_color - nodesarray[i]->m_color));
+			if (neighbour->m_color - nodesarray[i]->m_color < 0)
+				weight = 0.5f;
+			addNeighboursToNode(nodesarray[i], neighbour, weight * mapValue(abs(neighbour->m_color - nodesarray[i]->m_color), 255, 1));
 		}
 
 		if (i + 1 < width * height)
